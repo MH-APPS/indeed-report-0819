@@ -39,16 +39,16 @@ export async function POST(req: NextRequest) {
   // HTML for PDF (960x540 per page)
   const html = buildHtml({ ym, curr, prev, weekly, camps, monthlyInsights, weeklyInsights, campaignInsights });
 
-  // Launch headless browser
-  const isLocal = process.env.AWS_LAMBDA_FUNCTION_VERSION === undefined;
-  const executablePath = isLocal
-    ? process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-    : await chromium.executablePath();
+  // Launch headless browser (Vercel/AWS Lambda では @sparticuz/chromium を使用)
+  const isServerless = !!process.env.VERCEL || !!process.env.AWS_REGION || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
+  const executablePath = isServerless
+    ? await chromium.executablePath()
+    : (process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
   const browser = await puppeteer.launch({
-    args: isLocal ? [] : chromium.args,
+    args: isServerless ? chromium.args : [],
     defaultViewport: { width: 960, height: 540 },
     executablePath,
-    headless: true,
+    headless: isServerless ? chromium.headless : true,
   });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'networkidle0' });
