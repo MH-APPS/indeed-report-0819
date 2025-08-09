@@ -1,0 +1,16 @@
+:root { --accent: #0B6DFF; --muted: #667085; }
+html, body { margin: 0; padding: 0; font-family: 'Noto Sans JP', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; }
+body { color: #101828; background: #F6F8FB; }
+h1, h2, h3 { font-weight: 700; line-height: 1.3; }
+p, li, label, input, button { font-weight: 500; line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+.container { max-width: 960px; margin: 0 auto; padding: 24px; }
+.card { background: #ffffff; border-radius: 12px; box-shadow: 0 4px 20px rgba(16,24,40,0.06); padding: 24px; }
+.btn { background: var(--accent); color: #ffffff; border-radius: 10px; padding: 12px 16px; border: 0; font-weight: 700; cursor: pointer; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+label { display: block; margin-bottom: 8px; }
+input[type="file"] { padding: 10px; border: 1px solid #E4E7EC; border-radius: 8px; background: #fff; }
+input[type="month"], input[type="text"] { padding: 10px; border: 1px solid #E4E7EC; border-radius: 8px; }
+
