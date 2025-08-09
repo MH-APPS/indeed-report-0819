@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
   const executablePath = isServerless
     ? await chromium.executablePath()
     : (process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+  console.log('[pdf] env', {
+    nodeEnv: process.env.NODE_ENV,
+    vercel: process.env.VERCEL,
+    awsRegion: process.env.AWS_REGION,
+    awsLambda: process.env.AWS_LAMBDA_FUNCTION_VERSION,
+  });
+  console.log('[pdf] isServerless', isServerless, 'executablePath', executablePath);
   const browser = await puppeteer.launch({
     args: isServerless ? chromium.args : [],
     defaultViewport: { width: 960, height: 540 },
