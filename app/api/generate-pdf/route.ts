@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
   const html = buildHtml({ ym, curr, prev, weekly, camps, monthlyInsights, weeklyInsights, campaignInsights });
 
   // Launch headless browser (Vercel/AWS Lambda では @sparticuz/chromium を使用)
-  const isServerless = !!process.env.VERCEL || !!process.env.AWS_REGION || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
+  // In production (Vercel), always use bundled Chromium
+  const isServerless = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || !!process.env.AWS_REGION || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
   const executablePath = isServerless
     ? await chromium.executablePath()
     : (process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
