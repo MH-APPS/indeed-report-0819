@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+import puppeteer, { Browser } from 'puppeteer-core';
 import dayjs from 'dayjs';
 import { parseCsv, DailyRowSchema, CampaignRowSchema } from '@/lib/csv';
 import { aggregateMonthly, aggregateWeekly, aggregateCampaigns, formatPercent, formatYen } from '@/lib/aggregate';
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   // In production (Vercel), always use bundled Chromium
   const isServerless = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || !!process.env.AWS_REGION || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
   
-  let browser;
+  let browser: Browser | null = null;
   
   if (isServerless) {
     // Vercel/AWS Lambda環境での設定
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     
     // ブラウザが開いている場合はクリーンアップ
     try {
-      if (typeof browser !== 'undefined' && browser) {
+      if (browser) {
         await browser.close();
       }
     } catch (closeError) {
