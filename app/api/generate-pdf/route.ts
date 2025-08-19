@@ -41,19 +41,29 @@ export async function POST(req: NextRequest) {
 
   // Launch headless browser (Vercel/AWS Lambda では @sparticuz/chromium を使用)
   const isServerless = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
-  const executablePath = isServerless
-    ? await chromium.executablePath('/tmp')
-    : (process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+  
+  let executablePath;
+  let args;
+  
+  if (isServerless) {
+    executablePath = await chromium.executablePath();
+    args = [
+      ...chromium.args,
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process'
+    ];
+  } else {
+    executablePath = process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    args = ['--no-sandbox'];
+  }
   
   console.log('[pdf] isServerless', isServerless, 'executablePath', executablePath);
   
   const browser = await puppeteer.launch({
-    args: isServerless ? [
-      ...chromium.args,
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage'
-    ] : ['--no-sandbox'],
+    args,
     defaultViewport: { width: 960, height: 540 },
     executablePath,
     headless: isServerless ? chromium.headless : true,
