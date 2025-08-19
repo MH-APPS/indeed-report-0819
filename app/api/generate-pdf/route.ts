@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import chromium from '@sparticuz/chromium';
-import puppeteer, { Browser } from 'puppeteer-core';
+import puppeteer from 'puppeteer-core';
 import dayjs from 'dayjs';
 import { parseCsv, DailyRowSchema, CampaignRowSchema } from '@/lib/csv';
 import { aggregateMonthly, aggregateWeekly, aggregateCampaigns, formatPercent, formatYen } from '@/lib/aggregate';
@@ -10,127 +10,70 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  try {
-    const form = await req.formData();
-    const month = String(form.get('month'));
-    const daily = form.get('daily') as unknown as File;
-    const campaign = form.get('campaign') as unknown as File;
-    if (!month || !daily || !campaign) {
-      return new Response('missing fields', { status: 400 });
-    }
+  const form = await req.formData();
+  const month = String(form.get('month'));
+  const daily = form.get('daily') as unknown as File;
+  const campaign = form.get('campaign') as unknown as File;
+  if (!month || !daily || !campaign) {
+    return new Response('missing fields', { status: 400 });
+  }
 
-    // Parse CSVs
-    const dailyRowsRaw = await parseCsv<Record<string, string | number>>(daily);
-    const dailyRows = dailyRowsRaw.map((r) => DailyRowSchema.parse(r));
-    const campRowsRaw = await parseCsv<Record<string, string | number>>(campaign);
-    const campRows = campRowsRaw.map((r) => CampaignRowSchema.parse(r));
+  // Parse CSVs
+  const dailyRowsRaw = await parseCsv<Record<string, string | number>>(daily);
+  const dailyRows = dailyRowsRaw.map((r) => DailyRowSchema.parse(r));
+  const campRowsRaw = await parseCsv<Record<string, string | number>>(campaign);
+  const campRows = campRowsRaw.map((r) => CampaignRowSchema.parse(r));
 
-    // Aggregations
-    const ym = dayjs(month).format('YYYY-MM');
-    const curr = aggregateMonthly(dailyRows, ym);
-    const prevYm = dayjs(month).subtract(1, 'month').format('YYYY-MM');
-    const prev = aggregateMonthly(dailyRows, prevYm);
-    const weekly = aggregateWeekly(dailyRows, ym);
-    const camps = aggregateCampaigns(campRows);
+  // Aggregations
+  const ym = dayjs(month).format('YYYY-MM');
+  const curr = aggregateMonthly(dailyRows, ym);
+  const prevYm = dayjs(month).subtract(1, 'month').format('YYYY-MM');
+  const prev = aggregateMonthly(dailyRows, prevYm);
+  const weekly = aggregateWeekly(dailyRows, ym);
+  const camps = aggregateCampaigns(campRows);
 
-    const monthlyInsights = buildMonthlyInsights(curr, prev);
-    const weeklyInsights = buildWeeklyInsights(weekly);
-    const campaignInsights = buildCampaignInsights(camps);
+  const monthlyInsights = buildMonthlyInsights(curr, prev);
+  const weeklyInsights = buildWeeklyInsights(weekly);
+  const campaignInsights = buildCampaignInsights(camps);
 
-    // HTML for PDF (960x540 per page)
-    const html = buildHtml({ ym, curr, prev, weekly, camps, monthlyInsights, weeklyInsights, campaignInsights });
+  // HTML for PDF (960x540 per page)
+  const html = buildHtml({ ym, curr, prev, weekly, camps, monthlyInsights, weeklyInsights, campaignInsights });
 
   // Launch headless browser (Vercel/AWS Lambda では @sparticuz/chromium を使用)
-  // In production (Vercel), always use bundled Chromium
-  const isServerless = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || !!process.env.AWS_REGION || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
+  const isServerless = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+  const executablePath = isServerless
+    ? await chromium.executablePath('/tmp')
+    : (process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
   
-  let browser: Browser | null = null;
+  console.log('[pdf] isServerless', isServerless, 'executablePath', executablePath);
   
-  if (isServerless) {
-    // Vercel/AWS Lambda環境での設定
-    const executablePath = await chromium.executablePath('/tmp');
-    
-    console.log('[pdf] env', {
-      nodeEnv: process.env.NODE_ENV,
-      vercel: process.env.VERCEL,
-      awsRegion: process.env.AWS_REGION,
-      awsLambda: process.env.AWS_LAMBDA_FUNCTION_VERSION,
-    });
-    console.log('[pdf] isServerless', isServerless, 'executablePath', executablePath);
-    
-    browser = await puppeteer.launch({
-      args: [
-        ...chromium.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu'
-      ],
-      defaultViewport: { width: 960, height: 540 },
-      executablePath,
-      headless: chromium.headless,
-    });
-  } else {
-    // ローカル開発環境での設定
-    const executablePath = process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    console.log('[pdf] local development, executablePath', executablePath);
-    
-    browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      defaultViewport: { width: 960, height: 540 },
-      executablePath,
-      headless: true,
-    });
-  }
-    const page = await browser.newPage();
-    
-    // PDFコンテンツの設定とタイムアウト設定
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
-    
-    const pdf = await page.pdf({
-      printBackground: true,
-      width: '960px',
-      height: '540px',
-      // one section per page; no range restriction
-    });
-    
-    await browser.close();
+  const browser = await puppeteer.launch({
+    args: isServerless ? [
+      ...chromium.args,
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage'
+    ] : ['--no-sandbox'],
+    defaultViewport: { width: 960, height: 540 },
+    executablePath,
+    headless: isServerless ? chromium.headless : true,
+  });
+  
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: 'networkidle0' });
+  const pdf = await page.pdf({
+    printBackground: true,
+    width: '960px',
+    height: '540px',
+  });
+  await browser.close();
 
-    return new Response(new Uint8Array(pdf), {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Indeed_Report_${ym}.pdf"`
-      }
-    });
-  } catch (error) {
-    console.error('[pdf] Error generating PDF:', error);
-    
-    // ブラウザが開いている場合はクリーンアップ
-    try {
-      if (browser) {
-        await browser.close();
-      }
-    } catch (closeError) {
-      console.error('[pdf] Error closing browser:', closeError);
+  return new Response(new Uint8Array(pdf), {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="Indeed_Report_${ym}.pdf"`
     }
-    
-    return new Response(
-      JSON.stringify({ 
-        error: 'PDF生成に失敗しました', 
-        details: error instanceof Error ? error.message : String(error) 
-      }), 
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-  }
+  });
 }
 
 function number(value: number): string { return value.toLocaleString('ja-JP'); }
