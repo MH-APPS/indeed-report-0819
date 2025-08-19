@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     args,
     defaultViewport: { width: 960, height: 540 },
     executablePath,
-    headless: isServerless ? chromium.headless : true,
+    headless: true,
   });
   
   const page = await browser.newPage();
